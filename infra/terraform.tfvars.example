@@ -1,0 +1,29 @@
+# AWS Configuration
+aws_region   = "us-east-1"
+project_name = "ftp-server"
+
+# EC2 Instance Configuration
+instance_type    = "t3.small"  # t3.micro, t3.small, t3.medium, etc.
+root_volume_size = 20          # Size in GB
+key_pair_name    = "my-key-pair"  # Name of your AWS key pair (must exist in AWS)
+
+# Security Configuration
+# IMPORTANT: Restrict SSH access to your IP for better security
+ssh_allowed_ips = ["0.0.0.0/0"]  # Example: ["1.2.3.4/32"] for your specific IP
+
+# S3 Configuration
+s3_bucket_name = "my-ftp-uploads-bucket-unique-name"  # Must be globally unique
+s3_prefix      = "ftp_uploads/"
+
+# Optional: Enable automatic deletion of old files
+enable_s3_lifecycle = false
+s3_lifecycle_days   = 90  # Delete files older than 90 days
+
+# FTP Server Configuration
+ftp_user     = "reolink"
+ftp_password = "your-secure-password-here"  # Change this!
+ftp_port     = 2121
+
+# Docker Configuration
+ecr_repository_name = "ftp-server"  # Name of the ECR repository
+docker_image_tag    = "latest"      # Docker image tag to deploy
