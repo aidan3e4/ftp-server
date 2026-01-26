@@ -1,0 +1,7 @@
+.git
+.venv
+__pycache__
+*.pyc
+README.md
+.gitignore
+.python-version

@@ -1,0 +1,4 @@
+- do infra as code using terraform
+- give it fixed IP
+- actually try it
+- improve the way secrets are passed, right now they are in the .env that exists locally on my computer and gets passed in the docker image
