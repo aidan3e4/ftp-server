@@ -9,11 +9,20 @@ The infrastructure now uses Docker for deployment:
 2. Push to AWS ECR (Elastic Container Registry)
 3. EC2 instance pulls and runs the image automatically
 
-## Quick Start
+## Log-into AWS
+
+Logging into AWS can be done via sso with `aws sso login --profile PROFILE_NAME` but then we should export `export AWS_PROFILE=PROFILE_NAME` to use this login method. Otherwise just export the usual `AWS_*` env vars (access_id, password/token)
+
+## Quick Resume (after all infra is already setup)
+
+Use the `startup.sh` and `teardown.sh` scripts for stopping / resuming the service. This requires logging into AWS, see section above.
+
+
+## Quick Start (setup all infra for 1st time)
 
 ### 0. Prerequisites
 
-Login to AWS. Can be done via sso with `aws sso login --profile PROFILE_NAME` but then we should export `export AWS_PROFILE=PROFILE_NAME` to use this login method. Otherwise just export the usual AWS_* env vars (access_id, password/token)
+This requires logging into AWS, see section above.
 
 ### 1. Create Infrastructure
 

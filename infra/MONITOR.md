@@ -1,3 +1,5 @@
+# How to monitor the instance once deployed
+
 You can view the deployment logs by SSH-ing into your EC2 instance. Here are the different logs available:
 
 1. SSH into the Instance
