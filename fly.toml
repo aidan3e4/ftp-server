@@ -1,0 +1,100 @@
+# Fly.io configuration for FTP Server
+# See https://fly.io/docs/reference/configuration/
+
+app = "ftp-server-vibecast"
+primary_region = "fra"  # Frankfurt, change to your preferred region
+
+[build]
+  dockerfile = "Dockerfile"
+
+# FTP Control Port (TCP)
+[[services]]
+  internal_port = 2121
+  protocol = "tcp"
+
+  [[services.ports]]
+    port = 2121
+
+# FTP Passive Ports (TCP) - Range 60000-60010
+# Note: Fly.io has limits on port ranges, using smaller range
+[[services]]
+  internal_port = 60000
+  protocol = "tcp"
+  [[services.ports]]
+    port = 60000
+
+[[services]]
+  internal_port = 60001
+  protocol = "tcp"
+  [[services.ports]]
+    port = 60001
+
+[[services]]
+  internal_port = 60002
+  protocol = "tcp"
+  [[services.ports]]
+    port = 60002
+
+[[services]]
+  internal_port = 60003
+  protocol = "tcp"
+  [[services.ports]]
+    port = 60003
+
+[[services]]
+  internal_port = 60004
+  protocol = "tcp"
+  [[services.ports]]
+    port = 60004
+
+[[services]]
+  internal_port = 60005
+  protocol = "tcp"
+  [[services.ports]]
+    port = 60005
+
+[[services]]
+  internal_port = 60006
+  protocol = "tcp"
+  [[services.ports]]
+    port = 60006
+
+[[services]]
+  internal_port = 60007
+  protocol = "tcp"
+  [[services.ports]]
+    port = 60007
+
+[[services]]
+  internal_port = 60008
+  protocol = "tcp"
+  [[services.ports]]
+    port = 60008
+
+[[services]]
+  internal_port = 60009
+  protocol = "tcp"
+  [[services.ports]]
+    port = 60009
+
+[[services]]
+  internal_port = 60010
+  protocol = "tcp"
+  [[services.ports]]
+    port = 60010
+
+[env]
+  FTP_HOST = "0.0.0.0"
+  FTP_PORT = "2121"
+  FTP_MAX_CONS = "256"
+  FTP_MAX_CONS_PER_IP = "5"
+  FTP_PERMISSIONS = "elradfmwMT"
+  PASSIVE_PORT_START = "60000"
+  PASSIVE_PORT_END = "60011"
+  # MASQUERADE_ADDRESS will be set via secrets after deployment
+
+# Resources - using minimal for free tier
+[vm]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1

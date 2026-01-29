@@ -11,7 +11,6 @@ RUN uv sync --frozen --no-dev
 
 # Copy FTP server code
 COPY server.py .
-COPY .env .
 
 # Create temporary upload directory
 RUN mkdir -p /tmp/ftp_uploads

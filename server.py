@@ -35,6 +35,8 @@ FTP_PORT = int(os.environ.get("FTP_PORT", "2121"))
 FTP_HOST = os.environ.get("FTP_HOST", "0.0.0.0")  # 0.0.0.0 to accept connections from anywhere
 FTP_MAX_CONS = int(os.environ.get("FTP_MAX_CONS", "256"))
 FTP_MAX_CONS_PER_IP = int(os.environ.get("FTP_MAX_CONS_PER_IP", "5"))
+PASSIVE_PORT_START = int(os.environ.get("PASSIVE_PORT_START", "60000"))
+PASSIVE_PORT_END = int(os.environ.get("PASSIVE_PORT_END", "60100"))
 
 # S3 Configuration
 S3_BUCKET = os.environ.get("S3_BUCKET", "")
@@ -176,7 +178,7 @@ def setup_ftp_server():
     handler.banner = "Vibecast FTP Server ready."
 
     # Set passive ports range
-    handler.passive_ports = range(60000, 60100)
+    handler.passive_ports = range(PASSIVE_PORT_START, PASSIVE_PORT_END)
 
     # For Docker/NAT, set masquerade address if provided
     masquerade_address = os.environ.get("MASQUERADE_ADDRESS", "")
