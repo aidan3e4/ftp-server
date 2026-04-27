@@ -29,8 +29,6 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Configuration from environment variables
-FTP_USER = os.environ.get("FTP_USER", "reolink")
-FTP_PASSWORD = os.environ.get("FTP_PASSWORD", "camera123")
 FTP_PORT = int(os.environ.get("FTP_PORT", "2121"))
 FTP_HOST = os.environ.get("FTP_HOST", "0.0.0.0")  # 0.0.0.0 to accept connections from anywhere
 FTP_MAX_CONS = int(os.environ.get("FTP_MAX_CONS", "256"))
@@ -39,11 +37,21 @@ PASSIVE_PORT_START = int(os.environ.get("PASSIVE_PORT_START", "60000"))
 PASSIVE_PORT_END = int(os.environ.get("PASSIVE_PORT_END", "60100"))
 
 # S3 Configuration
-S3_BUCKET = os.environ.get("S3_BUCKET", "")
 S3_REGION = os.environ.get("S3_REGION", "us-east-1")
-S3_PREFIX = os.environ.get("S3_PREFIX", "ftp_uploads/")  # Prefix for uploaded files
+S3_PREFIX = os.environ.get("S3_PREFIX", "ftp_uploads/")
 AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID", "")
 AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
+
+# FTP_USER is both the FTP username and the S3 bucket name
+FTP_USER = os.environ.get("FTP_USER", "")
+FTP_PASSWORD = os.environ.get("FTP_PASSWORD", "")
+
+
+def get_camera_configs() -> list[dict]:
+    if not FTP_USER:
+        logger.warning("FTP_USER not set — no cameras registered")
+        return []
+    return [{"username": FTP_USER, "bucket": FTP_USER}]
 
 # Local temporary directory for receiving files before S3 upload
 FTP_UPLOAD_DIR = Path("/tmp/ftp_uploads")
@@ -63,23 +71,13 @@ FTP_UPLOAD_DIR = Path("/tmp/ftp_uploads")
 FTP_PERMISSIONS = os.environ.get("FTP_PERMISSIONS", "elradfmwMT")
 
 
-def upload_to_s3(local_file_path: Path, s3_key: str) -> bool:
-    """
-    Upload a file to S3 and delete the local copy.
-
-    Args:
-        local_file_path: Path to the local file
-        s3_key: S3 key (path) for the uploaded file
-
-    Returns:
-        True if upload succeeded, False otherwise
-    """
-    if not S3_BUCKET:
-        logger.warning("S3_BUCKET not configured. File will remain local.")
+def upload_to_s3(local_file_path: Path, s3_key: str, bucket: str) -> bool:
+    """Upload a file to S3 and delete the local copy."""
+    if not bucket:
+        logger.warning("S3 bucket not configured for this user. File will remain local.")
         return False
 
     try:
-        # Initialize S3 client
         s3_client = boto3.client(
             's3',
             region_name=S3_REGION,
@@ -87,16 +85,9 @@ def upload_to_s3(local_file_path: Path, s3_key: str) -> bool:
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY if AWS_SECRET_ACCESS_KEY else None
         )
 
-        # Upload file
-        s3_client.upload_file(
-            str(local_file_path),
-            S3_BUCKET,
-            s3_key
-        )
+        s3_client.upload_file(str(local_file_path), bucket, s3_key)
+        logger.info(f"Uploaded to S3: s3://{bucket}/{s3_key}")
 
-        logger.info(f"Uploaded to S3: s3://{S3_BUCKET}/{s3_key}")
-
-        # Delete local file after successful upload
         local_file_path.unlink()
         logger.info(f"Deleted local file: {local_file_path}")
 
@@ -113,66 +104,63 @@ def upload_to_s3(local_file_path: Path, s3_key: str) -> bool:
 class CustomFTPHandler(FTPHandler):
     """Custom FTP handler with additional logging."""
 
+    # Populated by setup_ftp_server: maps username -> S3 bucket
+    bucket_map: dict[str, str] = {}
+
     def on_connect(self):
-        """Called when client connects."""
         logger.info(f"Client connected: {self.remote_ip}:{self.remote_port}")
 
     def on_disconnect(self):
-        """Called when client disconnects."""
         logger.info(f"Client disconnected: {self.remote_ip}:{self.remote_port}")
 
     def on_login(self, username):
-        """Called when client logs in."""
         logger.info(f"User '{username}' logged in from {self.remote_ip}")
 
     def on_logout(self, username):
-        """Called when client logs out."""
         logger.info(f"User '{username}' logged out")
 
     def on_file_sent(self, file):
-        """Called when file is successfully sent."""
         logger.info(f"File sent: {file}")
 
     def on_file_received(self, file):
-        """Called when file is successfully received."""
         logger.info(f"File received: {file}")
 
-        # Upload to S3
         local_path = Path(file)
-        relative_path = local_path.relative_to(FTP_UPLOAD_DIR)
+        # Each user's home dir is FTP_UPLOAD_DIR/<username>, so strip that prefix
+        user_upload_dir = FTP_UPLOAD_DIR / self.username
+        relative_path = local_path.relative_to(user_upload_dir)
         s3_key = f"{S3_PREFIX}{relative_path}"
 
-        upload_to_s3(local_path, s3_key)
+        bucket = self.bucket_map.get(self.username, "")
+        upload_to_s3(local_path, s3_key, bucket)
 
     def on_incomplete_file_sent(self, file):
-        """Called when file transmission is incomplete."""
         logger.warning(f"Incomplete file sent: {file}")
 
     def on_incomplete_file_received(self, file):
-        """Called when file reception is incomplete."""
         logger.warning(f"Incomplete file received: {file}")
 
 
 def setup_ftp_server():
     """Setup and configure the FTP server."""
 
-    # Create upload directory if it doesn't exist
     FTP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Instantiate a dummy authorizer for managing 'virtual' users
     authorizer = DummyAuthorizer()
+    cameras = get_camera_configs()
+    bucket_map = {}
 
-    # Define a new user with full permissions
-    authorizer.add_user(
-        FTP_USER,
-        FTP_PASSWORD,
-        str(FTP_UPLOAD_DIR.absolute()),
-        perm=FTP_PERMISSIONS
-    )
+    for camera in cameras:
+        username = camera["username"]
+        user_dir = FTP_UPLOAD_DIR / username
+        user_dir.mkdir(parents=True, exist_ok=True)
+        authorizer.add_user(username, FTP_PASSWORD, str(user_dir), perm=FTP_PERMISSIONS)
+        bucket_map[username] = camera["bucket"]
+        logger.info(f"Registered camera user '{username}' -> bucket '{camera['bucket']}'")
 
-    # Instantiate FTP handler class
     handler = CustomFTPHandler
     handler.authorizer = authorizer
+    handler.bucket_map = bucket_map
 
     # Define a customized banner
     handler.banner = "Vibecast FTP Server ready."
@@ -205,18 +193,16 @@ def main():
     logger.info(f"Host: {FTP_HOST}")
     logger.info(f"Port: {FTP_PORT}")
     logger.info(f"Temporary upload directory: {FTP_UPLOAD_DIR.absolute()}")
-    logger.info(f"Username: {FTP_USER}")
     logger.info(f"Max connections: {FTP_MAX_CONS}")
     logger.info(f"Max connections per IP: {FTP_MAX_CONS_PER_IP}")
+    logger.info(f"S3 Region: {S3_REGION}")
+    logger.info(f"S3 Prefix: {S3_PREFIX}")
     logger.info("")
-    if S3_BUCKET:
-        logger.info(f"S3 Upload: ENABLED")
-        logger.info(f"S3 Bucket: {S3_BUCKET}")
-        logger.info(f"S3 Region: {S3_REGION}")
-        logger.info(f"S3 Prefix: {S3_PREFIX}")
-    else:
-        logger.warning("S3 Upload: DISABLED (S3_BUCKET not configured)")
-        logger.warning("Files will remain in local temporary directory")
+    cameras = get_camera_configs()
+    for camera in cameras:
+        bucket = camera["bucket"]
+        status = f"s3://{bucket}" if bucket else "NO BUCKET (files stay local)"
+        logger.info(f"  Camera user '{camera['username']}' -> {status}")
     logger.info("=" * 70)
 
     # Setup server
