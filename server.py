@@ -51,7 +51,7 @@ def get_camera_configs() -> list[dict]:
     if not FTP_USER:
         logger.warning("FTP_USER not set — no cameras registered")
         return []
-    return [{"username": u.strip().lower(), "bucket": u.strip().lower()} for u in FTP_USER.split(",") if u.strip()]
+    return [{"username": u.strip().lower(), "bucket": f"vibecast-{u.strip().lower()}"} for u in FTP_USER.split(",") if u.strip()]
 
 # Local temporary directory for receiving files before S3 upload
 FTP_UPLOAD_DIR = Path("/tmp/ftp_uploads")
